@@ -45,6 +45,15 @@ impl Distances for QuantizedVector {
     }
 }
 
+impl DenseVector {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.elements
+            .iter()
+            .flat_map(|&x| x.to_le_bytes())
+            .collect::<Vec<u8>>()
+    }
+}
+
 impl VectorStore {
     fn new() -> Self {
         VectorStore {
