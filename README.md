@@ -1,4 +1,4 @@
-# Villion Source Code Documentation
+# Villion
 
 Villion is a high-performance custom vector database built from scratch in Rust, designed to search over a billion vectors in under 100 milliseconds.
 
