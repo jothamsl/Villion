@@ -6,8 +6,11 @@ Villion is a high-performance custom vector database built from scratch in Rust,
 
 Build a blazing-fast vector database capable of:
 - **Scale**: Handling 1,000,000,000+ (1 billion) vectors
-- **Speed**: Sub-100ms query latency
-- **Efficiency**: Memory-optimized storage with quantization techniques
+- **Speed**: Sub-100ms query latency for top-k approximate nearest neighbor search
+- **Hybrid Search**: Combine vector similarity with exact keyword matching for higher relevance
+- **Filtering**: Metadata-aware reranking by tags, timestamps, and source
+- **Real-Time Ingestion**: Stream data with background index builds
+- **Zero-Downtime**: Versioned snapshots and atomic updates for uninterrupted queries
 - **Persistence**: Durable on-disk storage with efficient I/O
 
 ## Architecture Overview
@@ -173,18 +176,33 @@ let (index, distance) = store.search(&query);
 To achieve sub-100ms queries at billion scale, Villion employs:
 
 ### Current Implementations
-- ✅ **Dimension Reduction**: Stores reduced-dimension vectors for fast approximate search
-- ✅ **Two-Stage Search**: Coarse filtering + precise re-ranking
-- ✅ **K-Means Clustering**: Foundation for hierarchical indexing
-- ✅ **Buffered I/O**: Efficient disk operations
+- **Dimension Reduction**: Stores reduced-dimension vectors for fast approximate search
+- **Two-Stage Search**: Coarse filtering + precise re-ranking
+- **K-Means Clustering**: Foundation for hierarchical indexing
+- **Buffered I/O**: Efficient disk operations
 
-### Planned Optimizations
-- 🔄 **HNSW Index**: Hierarchical Navigable Small World graphs for O(log n) search
-- 🔄 **Product Quantization (PQ)**: Advanced compression for billion-scale datasets
-- 🔄 **SIMD Acceleration**: Hardware-level parallelism for distance calculations
-- 🔄 **Memory-Mapped Files**: Direct disk-to-memory mapping for huge datasets
-- 🔄 **Parallel Search**: Multi-threaded query processing
-- 🔄 **IVF Index**: Inverted file indexing using k-means centroids
+### Planned Features
+
+#### Search & Retrieval
+- **HNSW Index**: Hierarchical Navigable Small World graphs for O(log n) search
+- **IVF Index**: Inverted file indexing using k-means centroids
+- **Hybrid Search**: Combines vector similarity with exact keyword matching for higher relevance
+- **Approximate Nearest Neighbor (ANN)**: Sub-100ms top-k queries at billion scale
+
+#### Filtering & Reranking
+- **Metadata-Aware Reranking**: Filter and rerank by tags, timestamps, source, and custom attributes
+- **Filtering Support**: Pre-filter or post-filter results based on metadata constraints
+
+#### Compression & Performance
+- **Product Quantization (PQ)**: Advanced compression for billion-scale datasets
+- **SIMD Acceleration**: Hardware-level parallelism for distance calculations
+- **Memory-Mapped Files**: Direct disk-to-memory mapping for huge datasets
+- **Parallel Search**: Multi-threaded query processing
+
+#### Data Management
+- **Real-Time Ingestion**: Stream vectors with background index builds
+- **Versioned Snapshots**: Point-in-time recovery and rollback capabilities
+- **Atomic Updates**: Zero-downtime queries during index updates
 
 ---
 
