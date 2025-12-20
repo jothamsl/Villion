@@ -25,11 +25,26 @@ impl Distances for QuantizedVector {
 }
 
 impl DenseVector {
-    fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         self.elements
             .iter()
             .flat_map(|&x| x.to_le_bytes())
             .collect::<Vec<u8>>()
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let elements = bytes
+            .chunks(4)
+            .map(|chunk| {
+                // Convert chunk from &[u8] to [u8; 4] array
+                let array: [u8; 4] = chunk.try_into().expect("Invalid byte length for f32");
+
+                // Convert from little endian to bytes
+                f32::from_le_bytes(array)
+            })
+            .collect();
+
+        DenseVector { elements }
     }
 }
 
