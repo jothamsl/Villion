@@ -51,31 +51,38 @@ pub fn kmeans(vectors: &[DenseVector], k: usize, max_iters: usize) -> Vec<DenseV
 
         for v in vectors {
             // Find index of closest centroid to v
-            let closest_index = centroids
-                .iter()
-                .map(|centroid| centroid.distance(&v))
-                .enumerate()
-                .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(indx, _)| indx)
-                .unwrap();
-            
+            let closest_index = nearest_vector_index(&v, &centroids);
+
             // Add v to the closest group
             clusters[closest_index].push(v.clone());
         }
-        
+
         // Move centroids to the average of their group
-        let new_centroids: Vec<DenseVector> = clusters.iter().map(|cluster| {
-            if cluster.is_empty() {
-                // if centroid has no surrounding vectors, they stay put
-                // TODO: update logic to pick a new random spot
-                centroids[0].clone()
-            } else {
-                mean_vector(cluster)
-            }
-        }).collect();
-        
+        let new_centroids: Vec<DenseVector> = clusters
+            .iter()
+            .map(|cluster| {
+                if cluster.is_empty() {
+                    // if centroid has no surrounding vectors, they stay put
+                    // TODO: update logic to pick a new random spot
+                    centroids[0].clone()
+                } else {
+                    mean_vector(cluster)
+                }
+            })
+            .collect();
+
         centroids = new_centroids;
     }
 
     centroids
+}
+
+pub fn nearest_vector_index(query_vec: &DenseVector, centroids: &[DenseVector]) -> usize {
+    centroids
+        .iter()
+        .map(|centroid| centroid.distance(&query_vec))
+        .enumerate()
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(indx, _)| indx)
+        .unwrap()
 }

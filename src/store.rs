@@ -1,22 +1,28 @@
+use crate::math::{kmeans, nearest_vector_index};
 use crate::vector::{DenseVector, Distances, QuantizedVector};
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 
 #[derive(Debug, Clone)]
 pub struct VectorStore {
-    // This is our "Index". Fast to scan, but lower accuracy.
-    quantized: Vec<QuantizedVector>,
+    pub dense: Vec<DenseVector>,
+    pub quantized: Vec<QuantizedVector>,
 
-    // This represents our "Disk". Slow to access, perfect accuracy.
-    dense: Vec<DenseVector>,
+    // Maps a cluster id -> a list of vectors in that cluster
+    pub ivf_index: Option<HashMap<usize, Vec<usize>>>, // we use Option because it doesn't exist initially
+    pub centroids: Option<Vec<DenseVector>>,
 }
 
 impl VectorStore {
     pub fn new() -> Self {
+        // Initialize vectors
         VectorStore {
             quantized: Vec::new(),
             dense: Vec::new(),
+            ivf_index: None,
+            centroids: None,
         }
     }
 
@@ -53,6 +59,10 @@ impl VectorStore {
 
         (best_index, precise_distance)
     }
+
+    // pub fn search_ivf(&self, query: &DenseVector) -> Option<(usize, f32)> {
+
+    // }
 
     pub fn save_to_disk(&self, path: &str) -> std::io::Result<()> {
         if self.dense.is_empty() {
@@ -111,6 +121,32 @@ impl VectorStore {
         }
 
         Ok(store)
+    }
+
+    pub fn build_index(&mut self, num_clusters: usize, max_iters: usize) {
+        // Train the centroids
+        let centroids = kmeans(&self.dense, num_clusters, max_iters);
+
+        // Setup the empty index
+        let mut index: HashMap<usize, Vec<usize>> = HashMap::new();
+        for i in 0..num_clusters {
+            index.insert(i, Vec::new());
+        }
+
+        // Assign every vector to a cluster: O(n)
+        for (i, vector) in self.dense.iter().enumerate() {
+            // Find the closest centroid index for this vector
+            let best_centroid_index = nearest_vector_index(&vector, &centroids);
+
+            // Add the ID to the bucket
+            if let Some(bucket) = index.get_mut(&best_centroid_index) {
+                bucket.push(i);
+            }
+        }
+
+        // save results to the struct
+        self.centroids = Some(centroids);
+        self.ivf_index = Some(index);
     }
 }
 
