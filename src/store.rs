@@ -5,6 +5,84 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 
+pub trait SearchStrategy {
+    fn search(&self, store: &VectorStore, query_vec: &DenseVector) -> Option<(usize, f32)>;
+}
+
+// Index algorithms
+// pub struct HNSWSearch; // Best for large-scale data
+// pub struct IVFPQSearch;
+pub struct IVFSearch;
+pub struct BruteForceSearch; // Flat index (100% accuracy but speed tradeoff)
+
+impl SearchStrategy for BruteForceSearch {
+    fn search(&self, store: &VectorStore, query_vec: &DenseVector) -> Option<(usize, f32)> {
+        let quant_query = QuantizedVector {
+            elements: query_vec.elements.iter().take(2).cloned().collect(),
+        };
+
+        let mut best_distance = f32::MAX;
+        let mut best_index = 0;
+
+        for (i, v) in store.quantized.iter().enumerate() {
+            let dist = v.distance(&quant_query);
+
+            if dist < best_distance {
+                best_distance = dist;
+                best_index = i;
+            }
+        }
+
+        let precise_distance = store.dense[best_index].distance(query_vec);
+
+        Some((best_index, precise_distance))
+    }
+}
+
+impl SearchStrategy for IVFSearch {
+    fn search(&self, store: &VectorStore, query_vec: &DenseVector) -> Option<(usize, f32)> {
+        if store.centroids.is_none() || store.ivf_index.is_none() {
+            eprintln!("IVF Index not built! Call build_index() first.");
+            return None;
+        }
+
+        let centroids = store.centroids.as_ref().unwrap();
+        let index = store.ivf_index.as_ref().unwrap();
+
+        // Find the nearest centroid (The "Bucket")
+        let best_centroid_index = nearest_vector_index(query_vec, centroids);
+
+        // Retrieve candidate indices from that bucket
+        // If the bucket is empty/missing, return None
+        let candidate_indices = match index.get(&best_centroid_index) {
+            Some(indices) => indices,
+            None => return None, 
+        };
+
+        // 4. Search ONLY the candidates in this bucket
+        let mut best_distance = f32::MAX;
+        let mut best_index = usize::MAX;
+
+        for &idx in candidate_indices {
+            // We jump straight to the dense vector in the main storage
+            let candidate_vec = &store.dense[idx];
+            let dist = candidate_vec.distance(query_vec);
+
+            if dist < best_distance {
+                best_distance = dist;
+                best_index = idx;
+            }
+        }
+
+        // If we found nothing (empty bucket), return None
+        if best_index == usize::MAX {
+            None
+        } else {
+            Some((best_index, best_distance))
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VectorStore {
     pub dense: Vec<DenseVector>,
@@ -38,31 +116,9 @@ impl VectorStore {
         self.dense.push(full_vector);
     }
 
-    pub fn search(&self, query_vector: &DenseVector) -> (usize, f32) {
-        let quant_query = QuantizedVector {
-            elements: query_vector.elements.iter().take(2).cloned().collect(),
-        };
-
-        let mut best_distance = f32::MAX;
-        let mut best_index = 0;
-
-        for (i, v) in self.quantized.iter().enumerate() {
-            let dist = v.distance(&quant_query);
-
-            if dist < best_distance {
-                best_distance = dist;
-                best_index = i;
-            }
-        }
-
-        let precise_distance = self.dense[best_index].distance(query_vector);
-
-        (best_index, precise_distance)
+    pub fn search<S: SearchStrategy>(&self, query_vec: &DenseVector, strategy: S) -> Option<(usize, f32)> {
+        strategy.search(self, query_vec)
     }
-
-    // pub fn search_ivf(&self, query: &DenseVector) -> Option<(usize, f32)> {
-
-    // }
 
     pub fn save_to_disk(&self, path: &str) -> std::io::Result<()> {
         if self.dense.is_empty() {
